@@ -1,9 +1,7 @@
 import axios from 'axios';
-import React, { useState } from 'react'
+import React, { Dispatch, SetStateAction, useState } from 'react'
 
-export const useStorachaHooks = () => {
-
-  const[image, setImage] = useState<File|null>(null);
+export const useStorachaHooks = ({image}:{image:File}) => {
 
   async function getRes(){
     try{
@@ -18,11 +16,5 @@ export const useStorachaHooks = () => {
     }
   }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-        setImage(e.target.files[0]);
-    }
-};
-
-  return {image, getRes, handleImageChange}
+  return {image, getRes}
 }

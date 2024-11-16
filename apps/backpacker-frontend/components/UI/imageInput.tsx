@@ -1,9 +1,9 @@
 import Image from 'next/image'
 import React from 'react'
 
-export const ImageInput = ({image, handleChange}:{image:File, handleChange:()=>{}}) => {
+export const ImageInput = ({image, handleChange}:{image:File, handleChange:(e: React.ChangeEvent<HTMLInputElement>)=>void}) => {
   return (
-    <label htmlFor="dropzone-file" className="flex flex-col aspect-square items-center justify-center md:w-1/3 border-2 border-web-textBoxShine border-dashed rounded-lg cursor-pointer p-2">
+    <label htmlFor="dropzone-file" className="flex flex-col aspect-square items-center justify-center w-40 h-40 border-2 border-web-textBoxShine border-dashed rounded-lg cursor-pointer p-2">
         <div className="flex flex-col items-center aspect-square overflow-hidden justify-center rounded-lg w-full h-full hover:bg-web-textBoxShine">
           {!image ? (
             <svg className="w-8 h-8 text-web-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
