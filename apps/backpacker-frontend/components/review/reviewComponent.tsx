@@ -48,14 +48,14 @@ export const ReviewComponent = () => {
       }
 
       console.log(contractAdds.minting, mintingAbi)
-      // const contract:any = await useContractSetup({address: contractAdds.minting, abi: mintingAbi});
-      // console.log(contract);
+      const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi, wallet:primaryWallet});
+
       const result = await upload(place?.properties.id , image, description, name, tags, Number(rating));
       if (result.success) {
         console.log('Image URL:', getIPFSUrl(result.imageCid!));
         console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
 
-      //   //add to localstorage
+        //add to localstorage
         const reviews:any = JSON.parse(localStorage.getItem('reviews') || '[]');
         localStorage.setItem('reviews', JSON.stringify([...reviews,
           {
@@ -68,14 +68,14 @@ export const ReviewComponent = () => {
           }]
         ));
 
-        const formdata = new FormData();
-        formdata.append('id', place?.properties.id);
-        formdata.append('address', address);
-        formdata.append('uri', getIPFSUrl(result.metadataCid!));
+        const formData = new FormData();
 
-      const res = await axios.post("/api/mint", formdata);
+      formData.append('id', place.properties.id);
+      formData.append('uri', getIPFSUrl(result.metadataCid!));
+      formData.append('address', address as string );
 
-      console.log(res);
+      const res = await axios.post("/api/mint",formData);
+      
 
       } else {
         console.error('Upload failed:', result.error);

@@ -13,14 +13,12 @@ export const useReviewsByPlace = () => {
       const contract = await useContractSetup({address: contractAdds.minting, abi, wallet:primaryWallet});
       const res = await contract?.returnURIsByPlace(placeId);
 
+
       return res;
     }
     catch(err){
       console.log(err);
     }
-  }
 
-  return {
-    getPosts
-  }
+}
 }
