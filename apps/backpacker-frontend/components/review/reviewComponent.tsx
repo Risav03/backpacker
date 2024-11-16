@@ -42,7 +42,11 @@ export const ReviewComponent = () => {
         console.log('Image URL:', getIPFSUrl(result.imageCid!));
         console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
 
-        await contract?.safeMint(address , result.metadataCid);
+        const tx = await contract?.safeMint(getIPFSUrl(result.metadataCid!));
+      
+      // Wait for transaction to be mined
+      const receipt = await tx.wait();
+      
 
       } else {
         console.error('Upload failed:', result.error);

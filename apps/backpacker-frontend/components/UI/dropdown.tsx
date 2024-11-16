@@ -88,8 +88,8 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-full px-4 py-2 text-left text-sm border rounded-md 
-                   hover:border-blue-500 focus:outline-none focus:ring-2 
-                   focus:ring-blue-500"
+                   hover:border-web-accent-blue-2 focus:outline-none focus:ring-2 
+                   focus:ring-web-accent-blue-2"
         >
           Select tags...
         </button>
@@ -106,7 +106,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-2 py-1 text-sm border rounded-md focus:outline-none 
-                         focus:ring-2 focus:ring-blue-500"
+                         focus:ring-2 focus:ring-web-accent-blue-2"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
