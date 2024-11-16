@@ -20,25 +20,25 @@ export async function POST(req) {
         }
 
         // Initialize provider with ethers v6 syntax
-        const provider = new ethers.getDefaultProvider(
-            `https://flow-mainnet.g.alchemy.com/v2/CA4eh0FjTxMenSW3QxTpJ7D-vWMSHVjq`
-        );
-
-        // Initialize wallet
-        const privateKey = process.env.ADMIN_PVT_KEY;
-        if (!privateKey) {
-            throw new Error("Private key not found in environment variables");
-        }
-        const wallet = new ethers.Wallet(privateKey);
-
-        const signer = wallet.connect(provider);
-
-        // Create contract instance
-        const contract = new ethers.Contract(
-            contractAdds.minting,
-            abi,
-            signer
-        );
+        const provider = new ethers.JsonRpcProvider('https://mainnet.evm.nodes.onflow.org');
+            
+            // Fix 3: Add error handling for private key
+            const privateKey = process.env.NEXT_PUBLIC_PVT;
+            if (!privateKey) {
+                throw new Error("Private key not found in environment variables");
+            }
+    
+            // Fix 4: Create wallet and connect to provider
+            const wallet = new ethers.Wallet(privateKey, provider);
+            // Remove unnecessary .connect() since wallet is already connected to provider
+    
+            // Fix 5: Create contract instance
+            const contract = new ethers.Contract(
+                address,
+                abi,
+                wallet  // Use wallet directly as it's already connected to provider
+            );
+    
 
         // Prepare transaction with explicit parameters
         const tx = await contract.safeMint(

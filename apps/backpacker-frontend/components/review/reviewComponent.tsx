@@ -14,6 +14,7 @@ import { contractAdds } from '@/lib/contractAdds'
 import Navbar from "@/components/UI/navbar"
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core'
 import { useGlobalContext } from '@/context/MainContext'
+import axios from 'axios'
 
 
 export const ReviewComponent = () => {
@@ -46,15 +47,15 @@ export const ReviewComponent = () => {
         return;
       }
 
-      // console.log(contractAdds.minting, mintingAbi)
-      const contract:any = await useContractSetup({address: contractAdds.minting, abi: mintingAbi});
-      console.log(contract);
+      console.log(contractAdds.minting, mintingAbi)
+      // const contract:any = await useContractSetup({address: contractAdds.minting, abi: mintingAbi});
+      // console.log(contract);
       const result = await upload(place?.properties.id , image, description, name, tags, Number(rating));
       if (result.success) {
         console.log('Image URL:', getIPFSUrl(result.imageCid!));
         console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
 
-        //add to localstorage
+      //   //add to localstorage
         const reviews:any = JSON.parse(localStorage.getItem('reviews') || '[]');
         localStorage.setItem('reviews', JSON.stringify([...reviews,
           {
@@ -67,12 +68,14 @@ export const ReviewComponent = () => {
           }]
         ));
 
-        const tx = await contract?.safeMint(getIPFSUrl(result?.metadataCid as string), place.properties.id , address);
-      
-      // Wait for transaction to be mined
-      const receipt = await tx?.wait();
-      console.log(receipt)
-      
+        const formdata = new FormData();
+        formdata.append('id', place?.properties.id);
+        formdata.append('address', address);
+        formdata.append('uri', getIPFSUrl(result.metadataCid!));
+
+      const res = await axios.post("/api/mint", formdata);
+
+      console.log(res);
 
       } else {
         console.error('Upload failed:', result.error);
