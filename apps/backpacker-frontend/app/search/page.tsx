@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 interface SearchResult {
   properties: {
+    id: string;
     name: string;
     label: string;
     country: string;

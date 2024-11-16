@@ -17,7 +17,7 @@ import { useGlobalContext } from '@/context/MainContext'
 
 
 export const ReviewComponent = () => {
-    const {name, setName, description, setDescription, tags, setTags, image, setImage, handleImageChange} = useReviewHooks();
+    const {name, setName, description, setDescription, tags, setTags, image, setImage, handleImageChange, rating, setRating} = useReviewHooks();
 
     const { place, setPlace } = useGlobalContext();
     const { primaryWallet } = useDynamicContext()
@@ -41,11 +41,15 @@ export const ReviewComponent = () => {
         toast.error('Please connect your wallet');
         return;
       }
+      if(!place){
+        toast.error('Please select a place');
+        return;
+      }
 
       console.log(contractAdds.minting, mintingAbi)
       const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi, wallet:primaryWallet});
 
-      const result = await upload(image, description, name, tags);
+      const result = await upload(place?.properties.id , image, description, name, tags, rating);
       if (result.success) {
         console.log('Image URL:', getIPFSUrl(result.imageCid!));
         console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
@@ -104,6 +108,16 @@ export const ReviewComponent = () => {
               required={true}
             />
           </div>
+
+          <div className='w-full flex flex-row gap-2'>
+              <div onClick={()=>setRating(1)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==1 && " bg-green-400 " }`}>1</div>
+              <div onClick={()=>setRating(2)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==2 && " bg-green-400 " }`}>2</div>
+              <div onClick={()=>setRating(3)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==3 && " bg-green-400 " }`}>3</div>
+              <div onClick={()=>setRating(4)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==4 && " bg-green-400 " }`}>4</div>
+              <div onClick={()=>setRating(5)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==5 && " bg-green-400 " }`}>5</div>
+          </div>
+
+
         </div>
       </div>
        

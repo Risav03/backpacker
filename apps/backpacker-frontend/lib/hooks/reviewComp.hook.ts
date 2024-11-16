@@ -7,6 +7,7 @@ export const useReviewHooks = () => {
     const[description, setDescription] = useState<string>("");
     const[tags, setTags] = useState<string[]>([]);
     const[image, setImage] = useState<File>();
+    const [rating, setRating] = useState<number>(1);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -15,6 +16,6 @@ export const useReviewHooks = () => {
     };
 
   return {
-    name, setName, description, setDescription, tags, setTags, image, setImage, handleImageChange
+    name, setName, description, setDescription, tags, setTags, image, setImage, handleImageChange, rating, setRating
   }
 }

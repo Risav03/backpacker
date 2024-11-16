@@ -10,6 +10,7 @@ type GlobalContextType = {
 
 interface SearchResult {
   properties: {
+    id: string;
     name: string;
     label: string;
     country: string;

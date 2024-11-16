@@ -7,6 +7,7 @@ interface Attribute {
 }
 
 interface UploadData {
+  id:string;
   description: string;
   image: string; // IPFS URL
   name: string;
@@ -28,10 +29,12 @@ const formatAttributes = (tags: string[]): Attribute[] => {
 };
 
 const uploadToIPFS = async (
+  id: string,
   image: File,
   description: string,
   name: string,
-  tags: string[]
+  tags: string[],
+  rating:number
 ): Promise<UploadResult> => {
   try {
     // 1. Upload image first
@@ -43,11 +46,14 @@ const uploadToIPFS = async (
     
     // 2. Create and upload metadata
     const metadata: UploadData = {
+      id: id,
       description,
       name,
       attributes: formatAttributes(tags),
       image: `ipfs://${imageCid}`
     };
+
+    metadata.attributes.push({trait_type: "rating", value: rating})
 
     // Convert metadata to File object
     const metadataBlob = new Blob([JSON.stringify(metadata)], { 
@@ -92,14 +98,16 @@ export const useUploadToIPFS = () => {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
 
   const upload = async (
+    id: string,
     image: File,
     description: string,
     name: string,
-    tags: string[]
+    tags: string[],
+    rating:number
   ) => {
     setIsUploading(true);
     try {
-      const result = await uploadToIPFS(image, description, name, tags);
+      const result = await uploadToIPFS(id, image, description, name, tags, rating);
       setUploadResult(result);
       return result;
     } finally {
