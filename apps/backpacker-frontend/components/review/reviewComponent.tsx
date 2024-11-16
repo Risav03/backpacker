@@ -46,9 +46,9 @@ export const ReviewComponent = () => {
         return;
       }
 
-      console.log(contractAdds.minting, mintingAbi)
-      const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi, wallet:primaryWallet});
-
+      // console.log(contractAdds.minting, mintingAbi)
+      const contract:any = await useContractSetup({address: contractAdds.minting, abi: mintingAbi});
+      console.log(contract);
       const result = await upload(place?.properties.id , image, description, name, tags, Number(rating));
       if (result.success) {
         console.log('Image URL:', getIPFSUrl(result.imageCid!));
@@ -67,10 +67,11 @@ export const ReviewComponent = () => {
           }]
         ));
 
-        const tx = await contract?.safeMint(getIPFSUrl(result.metadataCid!));
+        const tx = await contract?.safeMint(getIPFSUrl(result?.metadataCid as string), place.properties.id , address);
       
       // Wait for transaction to be mined
-      const receipt = await tx.wait();
+      const receipt = await tx?.wait();
+      console.log(receipt)
       
 
       } else {
