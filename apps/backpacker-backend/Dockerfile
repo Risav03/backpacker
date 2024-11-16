@@ -1,5 +1,23 @@
 # syntax=docker.io/docker/dockerfile:1
-FROM --platform=linux/riscv64 cartesi/python:3.10-slim-jammy
+
+# build stage: includes resources necessary for installing dependencies
+
+# Here the image's platform does not necessarily have to be riscv64.
+# If any needed dependencies rely on native binaries, you must use
+# a riscv64 image such as cartesi/node:20-jammy for the build stage,
+# to ensure that the appropriate binaries will be generated.
+FROM node:20.16.0-bookworm AS build-stage
+
+WORKDIR /opt/cartesi/dapp
+COPY . .
+RUN yarn install && yarn build
+
+# runtime stage: produces final image that will be executed
+
+# Here the image's platform MUST be linux/riscv64.
+# Give preference to small base images, which lead to better start-up
+# performance when loading the Cartesi Machine.
+FROM --platform=linux/riscv64 cartesi/node:20.16.0-jammy-slim
 
 ARG MACHINE_EMULATOR_TOOLS_VERSION=0.14.1
 ADD https://github.com/cartesi/machine-emulator-tools/releases/download/v${MACHINE_EMULATOR_TOOLS_VERSION}/machine-emulator-tools-v${MACHINE_EMULATOR_TOOLS_VERSION}.deb /
@@ -22,17 +40,9 @@ EOF
 ENV PATH="/opt/cartesi/bin:${PATH}"
 
 WORKDIR /opt/cartesi/dapp
-COPY ./requirements.txt .
-
-RUN <<EOF
-set -e
-pip install -r requirements.txt --no-cache
-find /usr/local/lib -type d -name __pycache__ -exec rm -r {} +
-EOF
-
-COPY ./dapp.py .
+COPY --from=build-stage /opt/cartesi/dapp/dist .
 
 ENV ROLLUP_HTTP_SERVER_URL="http://127.0.0.1:5004"
 
 ENTRYPOINT ["rollup-init"]
-CMD ["python3", "dapp.py"]
+CMD ["node", "index.js"]

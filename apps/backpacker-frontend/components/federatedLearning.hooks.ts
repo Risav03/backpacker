@@ -1,19 +1,46 @@
-import { useState, useEffect, useCallback } from 'react';
-import * as tf from '@tensorflow/tfjs';
+import { useState, useEffect, useCallback } from "react";
+import * as tf from "@tensorflow/tfjs";
 
-// Enhanced type definitions
+export enum TransportMode {
+  car = "car",
+  train = "train",
+  bike = "bike",
+  walk = "walk",
+}
+
+export enum VisitTime {
+  morning = "morning",
+  afternoon = "afternoon",
+  evening = "evening",
+  night = "night",
+}
+
+export enum PoiTag {
+  Historical = "Historical",
+  Natural = "Natural",
+  Cultural = "Cultural",
+  Archaeological = "Archaeological",
+  Architectural = "Architectural",
+  Artistic = "Artistic",
+  Religious = "Religious",
+  Industrial = "Industrial",
+  Modern = "Modern",
+  Traditional = "Traditional",
+  Educational = "Educational",
+}
+
 interface TrainingPoint {
   poi_id: number;
-  transport_mode: number;
-  visit_time: string;
+  transport_mode: TransportMode;
+  visit_time: VisitTime;
   duration: number;
   budget: number;
 }
 
 interface NormalizedTrainingPoint {
   poi_id: number;
-  transport_mode: number;
-  visit_time: number;  // Normalized time value
+  transport_mode: TransportMode;
+  visit_time: VisitTime;
   duration: number;
   budget: number;
   timestamp: number;
@@ -21,15 +48,21 @@ interface NormalizedTrainingPoint {
 
 interface PublicPoiData {
   rating: number;
-  tags: string[];
+  tag: PoiTag;
 }
 
-interface Prediction {
+interface PoiPrediction {
+  poi_id: number;
   visit_likelihood: number;
-  best_time: string;
+  best_time: VisitTime;
   recommended_duration: number;
   recommended_budget: number;
   confidence_score: number;
+}
+
+interface RankedPredictions {
+  rankings: PoiPrediction[];
+  error?: string;
 }
 
 interface ModelState {
@@ -39,7 +72,47 @@ interface ModelState {
   lastTrainingTime: number | null;
 }
 
-export const useFederatedLearning = (initialPublicData: Record<number, PublicPoiData> = {}) => {
+interface RankedPrediction {
+  poi_id: number;
+  tag: PoiTag;
+  visit_likelihood: number;
+  best_visit_time: VisitTime;
+  recommended_duration: number;
+  recommended_budget: number;
+  confidence_score: number;
+}
+
+interface BatchPredictionInput {
+  poi_data: {
+    poi_id: number;
+    tag: PoiTag;
+  }[];
+}
+
+const encodeTransportMode = (mode: TransportMode): number[] => {
+  const encoding = new Array(4).fill(0);
+  const index = Object.values(TransportMode).indexOf(mode);
+  encoding[index] = 1;
+  return encoding;
+};
+
+const encodeVisitTime = (time: VisitTime): number[] => {
+  const encoding = new Array(4).fill(0);
+  const index = Object.values(VisitTime).indexOf(time);
+  encoding[index] = 1;
+  return encoding;
+};
+
+const encodeTag = (tag: PoiTag): number[] => {
+  const encoding = new Array(11).fill(0);
+  const index = Object.values(PoiTag).indexOf(tag);
+  encoding[index] = 1;
+  return encoding;
+};
+
+export const useFederatedLearning = (
+  initialPublicData: Record<number, PublicPoiData> = {}
+) => {
   const [model, setModel] = useState<tf.LayersModel | null>(null);
   const [localData, setLocalData] = useState<NormalizedTrainingPoint[]>([]);
   const [modelState, setModelState] = useState<ModelState>({
@@ -50,38 +123,48 @@ export const useFederatedLearning = (initialPublicData: Record<number, PublicPoi
   });
   const [publicData, setPublicData] = useState(initialPublicData);
 
-  // Initialize model
   const createModel = useCallback(() => {
     const newModel = tf.sequential();
-    
-    newModel.add(tf.layers.dense({
-      units: 64,
-      activation: 'relu',
-      inputShape: [10]
-    }));
-    
+
+    // Input shape: 20 features
+    // - 4 for transport mode (one-hot)
+    // - 4 for visit time (one-hot)
+    // - 11 for tag (one-hot)
+    // - 1 for rating
+
+    newModel.add(
+      tf.layers.dense({
+        units: 64,
+        activation: "relu",
+        inputShape: [20],
+      })
+    );
+
     newModel.add(tf.layers.dropout({ rate: 0.2 }));
-    
-    newModel.add(tf.layers.dense({
-      units: 32,
-      activation: 'relu'
-    }));
-    
-    newModel.add(tf.layers.dense({
-      units: 5,
-      activation: 'sigmoid'
-    }));
+
+    newModel.add(
+      tf.layers.dense({
+        units: 32,
+        activation: "relu",
+      })
+    );
+
+    newModel.add(
+      tf.layers.dense({
+        units: 5,
+        activation: "sigmoid",
+      })
+    );
 
     newModel.compile({
       optimizer: tf.train.adam(0.001),
-      loss: 'meanSquaredError',
-      metrics: ['accuracy']
+      loss: "meanSquaredError",
+      metrics: ["accuracy"],
     });
 
     return newModel;
   }, []);
 
-  // Initialize model on mount
   useEffect(() => {
     const initModel = async () => {
       const newModel = createModel();
@@ -92,195 +175,214 @@ export const useFederatedLearning = (initialPublicData: Record<number, PublicPoi
     initModel();
   }, [createModel]);
 
-  // Data normalization utilities
-  const normalizeTime = useCallback((time: string): number => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return (hours * 60 + minutes) / 1440;
-  }, []);
-
-  const denormalizeTime = useCallback((normalizedTime: number): string => {
-    const minutes = Math.round(normalizedTime * 1440);
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-  }, []);
-
   const normalizeBudget = useCallback((budget: number): number => {
     return budget / 1000;
   }, []);
 
-  // Local storage operations
   const saveLocalData = useCallback(async (data: NormalizedTrainingPoint[]) => {
-    localStorage.setItem('userTrainingData', JSON.stringify(data));
+    localStorage.setItem("userTrainingData", JSON.stringify(data));
   }, []);
 
   const loadLocalData = useCallback(async () => {
-    const stored = localStorage.getItem('userTrainingData');
-    const data = stored ? JSON.parse(stored) as NormalizedTrainingPoint[] : [];
+    const stored = localStorage.getItem("userTrainingData");
+    const data = stored
+      ? (JSON.parse(stored) as NormalizedTrainingPoint[])
+      : [];
     setLocalData(data);
     return data;
   }, []);
 
-  // Add training point
-  const addTrainingPoint = useCallback(async (poiData: TrainingPoint) => {
-    const normalizedPoint: NormalizedTrainingPoint = {
-      poi_id: poiData.poi_id,
-      transport_mode: poiData.transport_mode,
-      visit_time: normalizeTime(poiData.visit_time),
-      duration: poiData.duration / 60,
-      budget: normalizeBudget(poiData.budget),
-      timestamp: Date.now()
-    };
+  const addTrainingPoint = useCallback(
+    async (poiData: TrainingPoint) => {
+      const normalizedPoint: NormalizedTrainingPoint = {
+        poi_id: poiData.poi_id,
+        transport_mode: poiData.transport_mode,
+        visit_time: poiData.visit_time,
+        duration: poiData.duration / 60, // Convert to hours
+        budget: normalizeBudget(poiData.budget),
+        timestamp: Date.now(),
+      };
 
-    const newLocalData = [...localData, normalizedPoint];
-    setLocalData(newLocalData);
-    await saveLocalData(newLocalData);
-  }, [localData, normalizeTime, normalizeBudget, saveLocalData]);
+      const newLocalData = [...localData, normalizedPoint];
+      setLocalData(newLocalData);
+      await saveLocalData(newLocalData);
+    },
+    [localData, normalizeBudget, saveLocalData]
+  );
 
-  // Prepare training data
-  const prepareTrainingData = useCallback((data: NormalizedTrainingPoint[]) => {
-    const features: number[][] = [];
-    const labels: number[][] = [];
+  const prepareTrainingData = useCallback(
+    (data: NormalizedTrainingPoint[]) => {
+      const features: number[][] = [];
+      const labels: number[][] = [];
 
-    for (const point of data) {
-      const poiPublicData = publicData[point.poi_id] || {};
-      
-      // Process tags
-      const tagFeatures = new Array(4).fill(0);
-      (poiPublicData.tags || []).slice(0, 4).forEach((_, i) => {
-        tagFeatures[i] = 1;
-      });
+      for (const point of data) {
+        const poiPublicData = publicData[point.poi_id] || {
+          rating: 0,
+          tag: PoiTag.Historical,
+        };
 
-      features.push([
-        point.poi_id,
-        point.transport_mode,
-        point.visit_time,
-        point.duration,
-        point.budget,
-        poiPublicData.rating || 0,
-        ...tagFeatures
-      ]);
+        // Combine all features
+        const combinedFeatures = [
+          ...encodeTransportMode(point.transport_mode),
+          ...encodeVisitTime(point.visit_time),
+          ...encodeTag(poiPublicData.tag),
+          poiPublicData.rating || 0,
+        ];
 
-      labels.push([
-        1,
-        point.visit_time,
-        point.duration,
-        point.budget,
-        0.8
-      ]);
-    }
+        features.push(combinedFeatures);
 
-    return {
-      xs: tf.tensor2d(features),
-      ys: tf.tensor2d(labels)
-    };
-  }, [publicData]);
+        labels.push([
+          1, // visit likelihood
+          Object.values(VisitTime).indexOf(point.visit_time) / 3, // normalize time to 0-1
+          point.duration,
+          point.budget,
+          0.8, // confidence score
+        ]);
+      }
 
-  // Train model
+      return {
+        xs: tf.tensor2d(features),
+        ys: tf.tensor2d(labels),
+      };
+    },
+    [publicData]
+  );
+
   const trainModel = useCallback(async () => {
     if (!model || localData.length < 5) {
-      setModelState(prev => ({
+      setModelState((prev) => ({
         ...prev,
-        error: 'Insufficient data or model not ready'
+        error: "Insufficient data or model not ready",
       }));
       return null;
     }
 
-    setModelState(prev => ({ ...prev, isTraining: true, error: null }));
+    setModelState((prev) => ({ ...prev, isTraining: true, error: null }));
 
     try {
       const trainData = prepareTrainingData(localData);
-      
-      const history = await model.fit(
-        trainData.xs,
-        trainData.ys,
-        {
-          epochs: 10,
-          batchSize: 32,
-          validationSplit: 0.2,
-          shuffle: true
-        }
-      );
 
-      setModelState(prev => ({
+      const history = await model.fit(trainData.xs, trainData.ys, {
+        epochs: 10,
+        batchSize: 32,
+        validationSplit: 0.2,
+        shuffle: true,
+      });
+
+      setModelState((prev) => ({
         ...prev,
         isTraining: false,
         modelVersion: prev.modelVersion + 1,
-        lastTrainingTime: Date.now()
+        lastTrainingTime: Date.now(),
       }));
 
       return history;
     } catch (error) {
-      setModelState(prev => ({
+      setModelState((prev) => ({
         ...prev,
         isTraining: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error:
+          error instanceof Error ? error.message : "Unknown error occurred",
       }));
       return null;
     }
   }, [model, localData, prepareTrainingData]);
 
-  // Get model weights
   const getModelWeights = useCallback(async () => {
     if (!model) return null;
     const weights = model.getWeights();
-    const weightArrays = await Promise.all(
-      weights.map(w => w.array())
-    );
-    return weightArrays;
+    const weightArrays = await Promise.all(weights.map((w) => w.array()));
+    return [weightArrays];
   }, [model]);
 
-  // Update model weights
-  const updateModelWeights = useCallback(async (newWeights: number[][][]) => {
-    if (!model) return;
-    
-    const weightTensors = newWeights.map(w => tf.tensor(w));
-    await model.setWeights(weightTensors);
-    
-    setModelState(prev => ({
-      ...prev,
-      modelVersion: prev.modelVersion + 1
-    }));
-  }, [model]);
+  const updateModelWeights = useCallback(
+    async (newWeights: number[][][]) => {
+      if (!model) return;
 
-  // Generate predictions
-  const predict = useCallback(async (input: TrainingPoint): Promise<Prediction | null> => {
-    if (!model) return null;
+      const weightTensors = newWeights.map((w) => tf.tensor(w));
+      await model.setWeights(weightTensors);
 
-    const poiPublicData = publicData[input.poi_id] || {};
-    const tagFeatures = new Array(4).fill(0);
-    (poiPublicData.tags || []).slice(0, 4).forEach((_, i) => {
-      tagFeatures[i] = 1;
-    });
+      setModelState((prev) => ({
+        ...prev,
+        modelVersion: prev.modelVersion + 1,
+      }));
+    },
+    [model]
+  );
 
-    const features = [
-      input.poi_id,
-      input.transport_mode,
-      normalizeTime(input.visit_time),
-      input.duration / 60,
-      normalizeBudget(input.budget),
-      poiPublicData.rating || 0,
-      ...tagFeatures
-    ];
+  const predict = useCallback(
+    async (
+      poiIds: number[],
+      userContext: Omit<TrainingPoint, "poi_id">
+    ): Promise<RankedPredictions> => {
+      if (!model) {
+        return {
+          rankings: [],
+          error: "Model not initialized",
+        };
+      }
 
-    const inputTensor = tf.tensor2d([features]);
-    const predictionTensor = model.predict(inputTensor) as tf.Tensor;
-    const prediction = await predictionTensor.array() as number[];
-    
-    // Clean up tensor to prevent memory leaks
-    inputTensor.dispose();
-    predictionTensor.dispose();
-    
-    return {
-      visit_likelihood: prediction[0],
-      best_time: denormalizeTime(prediction[1]),
-      recommended_duration: Math.round(prediction[2] * 60),
-      recommended_budget: Math.round(prediction[3] * 1000),
-      confidence_score: prediction[4]
-    };
-  }, [model, publicData, normalizeTime, normalizeBudget, denormalizeTime]);
+      try {
+        // Generate predictions for each POI
+        const predictions = await Promise.all(
+          poiIds.map(async (poi_id) => {
+            const poiPublicData = publicData[poi_id] || {
+              rating: 0,
+              tag: PoiTag.Historical,
+            };
 
-  // Cleanup on unmount
+            // Prepare features
+            const features = [
+              ...encodeTransportMode(userContext.transport_mode),
+              ...encodeVisitTime(userContext.visit_time),
+              ...encodeTag(poiPublicData.tag),
+              poiPublicData.rating || 0,
+            ];
+
+            const inputTensor = tf.tensor2d([features]);
+            const predictionTensor = model.predict(inputTensor) as tf.Tensor;
+            const prediction = (await predictionTensor.array()) as number[];
+
+            // Clean up tensors
+            inputTensor.dispose();
+            predictionTensor.dispose();
+
+            // Convert the visit time index back to enum
+            const timeIndex = Math.round(prediction[1] * 3); // denormalize from 0-1 to 0-3
+            const visitTimes = Object.values(VisitTime);
+            const bestTime = visitTimes[
+              Math.min(timeIndex, visitTimes.length - 1)
+            ] as VisitTime;
+
+            return {
+              poi_id,
+              visit_likelihood: prediction[0],
+              best_time: bestTime,
+              recommended_duration: Math.round(prediction[2] * 60), // convert back to minutes
+              recommended_budget: Math.round(prediction[3] * 1000), // convert back to actual currency
+              confidence_score: prediction[4],
+            };
+          })
+        );
+
+        // Sort predictions by visit likelihood in descending order
+        const rankedPredictions = predictions.sort(
+          (a, b) => b.visit_likelihood - a.visit_likelihood
+        );
+
+        return { rankings: rankedPredictions };
+      } catch (error) {
+        console.error("Prediction error:", error);
+        return {
+          rankings: [],
+          error:
+            error instanceof Error ? error.message : "Unknown prediction error",
+        };
+      }
+    },
+    [model, publicData]
+  );
+
   useEffect(() => {
     return () => {
       if (model) {
@@ -297,6 +399,6 @@ export const useFederatedLearning = (initialPublicData: Record<number, PublicPoi
     updateModelWeights,
     modelState,
     localData,
-    setPublicData
+    setPublicData,
   };
 };
