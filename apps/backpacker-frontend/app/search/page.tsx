@@ -1,6 +1,8 @@
 'use client'
 import React, { useState } from 'react';
 import { Search } from 'lucide-react';
+import { useGlobalContext } from '@/context/MainContext';
+import { useRouter } from 'next/navigation';
 
 interface SearchResult {
   properties: {
@@ -53,16 +55,24 @@ const SearchButton = ({ onClick, isLoading }: {
   </button>
 );
 
-const ResultCard = ({ result }: { result: SearchResult }) => (
-  <div className="p-4 border rounded-lg mb-2 hover:bg-gray-50">
+const ResultCard = ({ result }: { result: SearchResult }) => {
+
+    const { place, setPlace } = useGlobalContext(); 
+    const router = useRouter();
+
+    return(
+    <div onClick={()=>{
+        setPlace(result);
+        router.push('/review');
+    }} className="p-4 border rounded-lg mb-2 hover:bg-gray-50">
     <h3 className="font-semibold">{result.properties.name}</h3>
     <p className="text-gray-600 text-sm">{result.properties.label}</p>
     <div className="mt-2 flex gap-4 text-sm text-gray-500">
       <span>Confidence: {(result.properties.confidence * 100).toFixed(0)}%</span>
       <span>Coordinates: {result.geometry.coordinates[1].toFixed(4)}, {result.geometry.coordinates[0].toFixed(4)}</span>
     </div>
-  </div>
-);
+  </div>)
+};
 
 const PlacesSearch = () => {
   const [searchQuery, setSearchQuery] = useState('');

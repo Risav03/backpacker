@@ -1,5 +1,5 @@
 'use client'
-import React from 'react'
+import React, { useEffect } from 'react'
 import { TextInput } from '../UI/textInput'
 import { useReviewHooks } from '@/lib/hooks/reviewComp.hook'
 import { ImageInput } from '../UI/imageInput'
@@ -13,15 +13,23 @@ import mintingAbi from '@/lib/abis/minting'
 import { contractAdds } from '@/lib/contractAdds'
 import Navbar from "@/components/UI/navbar"
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core'
+import { useGlobalContext } from '@/context/MainContext'
 
 
 export const ReviewComponent = () => {
     const {name, setName, description, setDescription, tags, setTags, image, setImage, handleImageChange} = useReviewHooks();
 
+    const { place, setPlace } = useGlobalContext();
     const { primaryWallet } = useDynamicContext()
 
     const { upload, isUploading, uploadResult } = useUploadToIPFS();
     const {address} = useAccount();
+
+    useEffect(() => {
+      if(!place) return;
+      console.log("place", place);
+      setName(place?.properties.name);
+    }, [place])
   
     const handleUpload = async () => {
 

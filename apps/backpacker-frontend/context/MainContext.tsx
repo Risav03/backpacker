@@ -3,9 +3,23 @@
 import { createContext, useContext, Dispatch, SetStateAction, useState, ReactNode } from "react";
 
 type GlobalContextType = {
-  place: string | null;
-  setPlace: Dispatch<SetStateAction<string | null>>;
+  place: SearchResult | null;
+  setPlace: Dispatch<SetStateAction<SearchResult | null>>;
 
+}
+
+interface SearchResult {
+  properties: {
+    name: string;
+    label: string;
+    country: string;
+    region: string;
+    locality?: string;
+    confidence: number;
+  };
+  geometry: {
+    coordinates: [number, number];
+  };
 }
 
 const GlobalContext = createContext<GlobalContextType>({
@@ -15,7 +29,7 @@ const GlobalContext = createContext<GlobalContextType>({
 
 export const GlobalContextProvider = ({ children } : { children: ReactNode}) => {
 
-  const [place, setPlace] = useState<string | null>(null);
+  const [place, setPlace] = useState<SearchResult | null>(null);
 
   return (
     <GlobalContext.Provider value={{
