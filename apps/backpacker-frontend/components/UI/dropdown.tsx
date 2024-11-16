@@ -9,11 +9,9 @@ interface MultiSelectProps {
 }
 
 const AVAILABLE_TAGS = [
-  'Action', 'Adventure', 'RPG', 'Strategy', 
-  'Simulation', 'Sports', 'Racing', 'Puzzle',
-  'Horror', 'Online', 'Multiplayer', 'Story-Rich',
-  'Indie', 'Casual', 'Open World', 'First-Person',
-  'Third-Person', 'Pixel Graphics', 'Retro', 'Arcade'
+  'Historical', 'Natural', 'Cultural', 'Archaeological', 
+  'Architectural', 'Artistic', 'Religious', 'Industrial',
+  'Modern', 'Traditional', 'Educational'
 ]
 
 export const MultiSelect: React.FC<MultiSelectProps> = ({
