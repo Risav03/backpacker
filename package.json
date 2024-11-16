@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0"
     "@dynamic-labs/ethereum": "^3.6.3",
     "@dynamic-labs/ethers-v6": "^3.6.3",
     "@dynamic-labs/flow": "^3.6.3",

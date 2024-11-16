@@ -8,6 +8,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
+
+      colors: {
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+
       backgroundImage: {
         'dark-gradient': 'linear-gradient(170deg, #4F5B7A -20%, #2E3547 -20%, #181B24 30%, #0D0F14 70%)',
         'ground-gradient': 'linear-gradient(to bottom, #414C6F 0%, #0D0F14 100%)',
