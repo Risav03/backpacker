@@ -279,11 +279,6 @@ export default [
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
 				"internalType": "string",
 				"name": "uri",
 				"type": "string"

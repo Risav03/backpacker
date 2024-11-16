@@ -83,7 +83,7 @@ const uploadToIPFS = async (
 
 // Helper to get gateway URL
 export const getIPFSUrl = (cid: string): string => {
-  return `https://ipfs.io/ipfs/${cid}`;
+  return `https://${cid}.ipfs.w3s.link`;
 };
 
 // React hook wrapper
