@@ -1,12 +1,12 @@
 'use client'
 import { ethers } from "ethers"  // Fix 1: Correct import syntax
 
-export const useContractSetup = async ({address, abi}:{address:string, abi:any}) => {
+export const useContractSetup = async ({address, abi}) => {
     try {
         // Fix 2: No need to check window.ethereum since we're using a direct provider
         if (typeof window.ethereum !== 'undefined'){
 
-            const provider = new ethers.providers.Web3Provider(window?.ethereum);
+            const provider = new ethers.JsonRpcProvider('https://mainnet.evm.nodes.onflow.org');
             
             // Fix 3: Add error handling for private key
             const privateKey = process.env.NEXT_PUBLIC_PVT;

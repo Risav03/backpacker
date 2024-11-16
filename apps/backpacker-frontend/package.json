@@ -14,7 +14,7 @@
     "@ipld/dag-ucan": "^3.4.0",
     "@web3-storage/w3up-client": "^16.4.1",
     "axios": "^1.7.7",
-    "ethers": "^5.7.2",
+    "ethers": "^6.13.4",
     "next": "14.2.10",
     "react": "^18",
     "react-dom": "^18"
