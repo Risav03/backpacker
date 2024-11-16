@@ -10,16 +10,16 @@ import {
   } from 'wagmi';
   import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
   import { http } from 'viem';
-  import { mainnet } from 'viem/chains';
+  import { flowMainnet, mainnet } from 'viem/chains';
   
   import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
   import { FlowWalletConnectors } from "@dynamic-labs/flow";
   
   const config = createConfig({
-    chains: [mainnet],
+    chains: [flowMainnet],
     multiInjectedProviderDiscovery: false,
     transports: {
-      [mainnet.id]: http(),
+      [flowMainnet.id]: http(),
     },
   });
     
@@ -32,7 +32,7 @@ const DynamicProvider = ({children}: { children:React.ReactNode }) => {
             environmentId: "c3ea1f51-58ba-4011-8038-13610169c724",
             
             walletConnectors: [
-            EthereumWalletConnectors,
+              EthereumWalletConnectors,
             FlowWalletConnectors
             ],
         }}
