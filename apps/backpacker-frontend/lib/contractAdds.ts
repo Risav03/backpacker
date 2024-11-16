@@ -1,3 +1,3 @@
 export const contractAdds = {
-    minting:"0xAEC43238315669267847B4246cE980f1F92807f1"
+    minting:"0x3964d70Bc8121fcD7286A2434472667C273D826D"
 }
