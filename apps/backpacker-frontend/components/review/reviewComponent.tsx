@@ -21,25 +21,25 @@ export const ReviewComponent = () => {
   
     const handleUpload = async () => {
 
-      if (!image) {
-        toast.error('Please select an image');
-        return;
-      }
-      if(!address){
-        toast.error('Please connect your wallet');
-        return;
-      }
+    //   if (!image) {
+    //     toast.error('Please select an image');
+    //     return;
+    //   }
+    //   if(!address){
+    //     toast.error('Please connect your wallet');
+    //     return;
+    //   }
 
-      const setup = useContractSetup({address: contractAdds.minting, abi: mintingAbi});
-      console.log("setup:", setup);
+      const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi});
+      console.log("name:", await contract?.name());
 
-      const result = await upload(image, description, name, tags);
-      if (result.success) {
-        console.log('Image URL:', getIPFSUrl(result.imageCid!));
-        console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
-      } else {
-        console.error('Upload failed:', result.error);
-      }
+    //   const result = await upload(image, description, name, tags);
+    //   if (result.success) {
+    //     console.log('Image URL:', getIPFSUrl(result.imageCid!));
+    //     console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
+    //   } else {
+    //     console.error('Upload failed:', result.error);
+    //   }
     };
 
   return (
