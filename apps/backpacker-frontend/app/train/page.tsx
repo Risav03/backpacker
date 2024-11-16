@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Clock, DollarSign, MapPin, Train, ChevronDown } from 'lucide-react';
 import { useFederatedLearning, TransportMode, VisitTime } from '@/components/federated/FederatedTest';
 import { toast } from 'react-toastify'
+import { useReviewsByPlace } from '@/lib/hooks/reviewsByPlace.hook';
 
 interface Review {
   poi_id: number;
@@ -23,6 +24,8 @@ interface TrainingPoint {
 }
 
 const ReviewManager = () => {
+
+  const {getPosts} = useReviewsByPlace();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isTrainingEnabled, setIsTrainingEnabled] = useState(false);
   const [openSelect, setOpenSelect] = useState<{ index: number | null; field: string | null }>({ 
@@ -37,9 +40,54 @@ const ReviewManager = () => {
     modelState,
   } = useFederatedLearning();
 
-  useEffect(() => {
+  useEffect( () => {
     const storedReviews = JSON.parse(localStorage.getItem('reviews') || '[]') as Review[];
     setReviews(storedReviews);
+
+    const getPublicStats = async () => {
+
+    const reviewsWithStats = await Promise.all(
+      reviews.map(async (localRev) => {
+        const placeIpfsReviews = await getPosts(localRev.poi_id.toString());
+    
+        // Extract ratings and tags from the attributes array
+        const ratings:any = [];
+        const tags:any = [];
+    
+        placeIpfsReviews.forEach((review:any) => {
+          review.attributes.forEach((attr:any) => {
+            if (attr.trait_type === "rating") {
+              ratings.push(attr.value); // Collect ratings
+            } else {
+              tags.push(attr.trait_type); // Collect non-rating tags
+            }
+          });
+        });
+    
+        // Calculate the average rating
+        const averageRating = ratings.reduce((sum:any, rating:any) => sum + rating, 0) / ratings.length;
+    
+        // Find the most frequent tag
+        const tagCounts = tags.reduce((acc:any, tag:any) => {
+          acc[tag] = (acc[tag] || 0) + 1;
+          return acc;
+        }, {});
+    
+        const mostFrequentTag = Object.keys(tagCounts).reduce((maxTag:any, tag:any) => {
+          return tagCounts[tag] > (tagCounts[maxTag] || 0) ? tag : maxTag;
+        }, null);
+    
+        return {
+          ...localRev,
+          rating: isNaN(averageRating) ? 0 : averageRating,
+          tag: mostFrequentTag || "None" // Handle case where no tags are found
+        };
+      })
+    );
+
+    }
+
+    getPublicStats();
     checkTrainingEnabled(storedReviews);
   }, []);
 
