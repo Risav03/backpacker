@@ -49,10 +49,23 @@ export const ReviewComponent = () => {
       console.log(contractAdds.minting, mintingAbi)
       const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi, wallet:primaryWallet});
 
-      const result = await upload(place?.properties.id , image, description, name, tags, rating);
+      const result = await upload(place?.properties.id , image, description, name, tags, Number(rating));
       if (result.success) {
         console.log('Image URL:', getIPFSUrl(result.imageCid!));
         console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
+
+        //add to localstorage
+        const reviews:any = JSON.parse(localStorage.getItem('reviews') || '[]');
+        localStorage.setItem('reviews', JSON.stringify([...reviews,
+          {
+            poi_id: place?.properties.id,
+            poi_name: name,
+            transport_mode: undefined,
+            visit_time: undefined,
+            duration: undefined,
+            budget: undefined,
+          }]
+        ));
 
         const tx = await contract?.safeMint(getIPFSUrl(result.metadataCid!));
       
@@ -109,14 +122,24 @@ export const ReviewComponent = () => {
             />
           </div>
 
-          <div className='w-full flex flex-row gap-2'>
+          {/* <div className='w-full flex flex-row gap-2'>
               <div onClick={()=>setRating(1)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==1 && " bg-green-400 " }`}>1</div>
               <div onClick={()=>setRating(2)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==2 && " bg-green-400 " }`}>2</div>
               <div onClick={()=>setRating(3)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==3 && " bg-green-400 " }`}>3</div>
               <div onClick={()=>setRating(4)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==4 && " bg-green-400 " }`}>4</div>
               <div onClick={()=>setRating(5)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==5 && " bg-green-400 " }`}>5</div>
-          </div>
+          </div> */}
 
+          <div className='w-full'>
+            <TextInput 
+              content={rating} 
+              heading='Rating' 
+              placeholder='Rate out of 1-5' 
+              required={true} 
+              setContent={setRating} 
+              limit={30} 
+            />
+          </div>
 
         </div>
       </div>
