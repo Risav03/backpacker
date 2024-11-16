@@ -11,35 +11,43 @@ import { useAccount } from 'wagmi'
 import { useContractSetup } from '@/lib/hooks/contractSetup.hook'
 import mintingAbi from '@/lib/abis/minting'
 import { contractAdds } from '@/lib/contractAdds'
+import { useDynamicContext } from '@dynamic-labs/sdk-react-core'
+
 
 export const ReviewComponent = () => {
 
     const {name, setName, description, setDescription, tags, setTags, image, setImage, handleImageChange} = useReviewHooks();
+
+    const { primaryWallet } = useDynamicContext()
+
 
     const { upload, isUploading, uploadResult } = useUploadToIPFS();
     const {address} = useAccount();
   
     const handleUpload = async () => {
 
-    //   if (!image) {
-    //     toast.error('Please select an image');
-    //     return;
-    //   }
-    //   if(!address){
-    //     toast.error('Please connect your wallet');
-    //     return;
-    //   }
+      if (!image) {
+        toast.error('Please select an image');
+        return;
+      }
+      if(!address){
+        toast.error('Please connect your wallet');
+        return;
+      }
 
-      const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi});
-      console.log("name:", await contract?.name());
+      console.log(contractAdds.minting, mintingAbi)
+      const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi, wallet:primaryWallet});
 
-    //   const result = await upload(image, description, name, tags);
-    //   if (result.success) {
-    //     console.log('Image URL:', getIPFSUrl(result.imageCid!));
-    //     console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
-    //   } else {
-    //     console.error('Upload failed:', result.error);
-    //   }
+      const result = await upload(image, description, name, tags);
+      if (result.success) {
+        console.log('Image URL:', getIPFSUrl(result.imageCid!));
+        console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
+
+        await contract?.safeMint(address , result.metadataCid);
+
+      } else {
+        console.error('Upload failed:', result.error);
+      }
     };
 
   return (
