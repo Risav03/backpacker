@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Logo from "@/assets/Logo.png"
 import Image from 'next/image';
 
-const navbar = () => {
+const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
@@ -137,4 +137,4 @@ const navbar = () => {
   )
 }
 
-export default navbar
+export default Navbar

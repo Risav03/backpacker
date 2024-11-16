@@ -11,27 +11,19 @@ import { useAccount } from 'wagmi'
 import { useContractSetup } from '@/lib/hooks/contractSetup.hook'
 import mintingAbi from '@/lib/abis/minting'
 import { contractAdds } from '@/lib/contractAdds'
-<<<<<<< HEAD
+import Navbar from "@/components/UI/navbar"
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core'
 
-=======
-import Navbar from '@/components/UI/navbar';
->>>>>>> 9a8f4e1 (review)
 
 export const ReviewComponent = () => {
     const {name, setName, description, setDescription, tags, setTags, image, setImage, handleImageChange} = useReviewHooks();
-<<<<<<< HEAD
 
     const { primaryWallet } = useDynamicContext()
 
-
-=======
->>>>>>> 9a8f4e1 (review)
     const { upload, isUploading, uploadResult } = useUploadToIPFS();
     const {address} = useAccount();
   
     const handleUpload = async () => {
-<<<<<<< HEAD
 
       if (!image) {
         toast.error('Please select an image');
@@ -55,10 +47,7 @@ export const ReviewComponent = () => {
       } else {
         console.error('Upload failed:', result.error);
       }
-=======
-      const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi});
-      console.log("name:", await contract?.name());
->>>>>>> 9a8f4e1 (review)
+
     };
 
   return (
