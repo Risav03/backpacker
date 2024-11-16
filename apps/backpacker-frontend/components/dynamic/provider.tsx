@@ -40,8 +40,8 @@ const DynamicProvider = ({children}: { children:React.ReactNode }) => {
         <WagmiProvider config={config}>
             <QueryClientProvider client={queryClient}>
                 <DynamicWagmiConnector>
-                  {children}
                   <DynamicWidget />
+                  {children}
                 </DynamicWagmiConnector>
             </QueryClientProvider>
         </WagmiProvider> 
