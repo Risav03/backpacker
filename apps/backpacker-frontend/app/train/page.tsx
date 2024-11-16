@@ -1,20 +1,50 @@
 'use client'
+
 import React, { useState, useEffect } from 'react';
 import { Clock, DollarSign, MapPin, Train, ChevronDown } from 'lucide-react';
+import { useFederatedLearning, TransportMode, VisitTime } from '@/components/federated/FederatedTest';
+import { toast } from 'react-toastify'
+
+interface Review {
+  poi_id: number;
+  poi_name: string;
+  transport_mode?: TransportMode;
+  visit_time?: VisitTime;
+  duration?: number;
+  budget?: number;
+}
+
+interface TrainingPoint {
+  poi_id: number;
+  transport_mode: TransportMode;
+  visit_time: VisitTime;
+  duration: number;
+  budget: number;
+}
 
 const ReviewManager = () => {
-  const [reviews, setReviews] = useState<any>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [isTrainingEnabled, setIsTrainingEnabled] = useState(false);
-  const [openSelect, setOpenSelect] = useState({ index: null, field: null });
+  const [openSelect, setOpenSelect] = useState<{ index: number | null; field: string | null }>({ 
+    index: null, 
+    field: null 
+  });
+
+  // Initialize the federated learning hook
+  const {
+    addTrainingPoint,
+    trainModel,
+    modelState,
+  } = useFederatedLearning();
 
   useEffect(() => {
-    const storedReviews = JSON.parse(localStorage.getItem('reviews') || '[]');
+    const storedReviews = JSON.parse(localStorage.getItem('reviews') || '[]') as Review[];
     setReviews(storedReviews);
     checkTrainingEnabled(storedReviews);
   }, []);
 
-  const checkTrainingEnabled = (currentReviews:any) => {
-    const allComplete = currentReviews.every((review:any) => 
+  const checkTrainingEnabled = (currentReviews: Review[]) => {
+    const allComplete = currentReviews.every((review) => 
       review.transport_mode && 
       review.visit_time && 
       review.duration && 
@@ -23,9 +53,8 @@ const ReviewManager = () => {
     setIsTrainingEnabled(allComplete);
   };
 
-  const handleUpdateReview = (index:any, field:any, value:any) => {
-    console.log(`Updating review ${index}, field: ${field}, value: ${value}`);
-    const updatedReviews:any = [...reviews];
+  const handleUpdateReview = (index: number, field: keyof Review, value: any) => {
+    const updatedReviews = [...reviews];
     updatedReviews[index] = {
       ...updatedReviews[index],
       [field]: value
@@ -34,28 +63,74 @@ const ReviewManager = () => {
     setReviews(updatedReviews);
     localStorage.setItem('reviews', JSON.stringify(updatedReviews));
     checkTrainingEnabled(updatedReviews);
-    // Show toast message (implement your preferred way)
-    console.log(`Updated ${field} successfully`);
+    // toast.success("Review Updated");
   };
 
-  const handleTrainModel = () => {
-    console.log('Training model with reviews:', reviews);
-    // Here you would typically send the data to your training endpoint
-    console.log('Training started successfully');
-    
-    localStorage.removeItem('reviews');
-    setReviews([]);
-    setIsTrainingEnabled(false);
+  const handleTrainModel = async () => {
+    try {
+      // Convert reviews to training points
+      for (const review of reviews) {
+        if (
+          review.transport_mode &&
+          review.visit_time &&
+          review.duration &&
+          review.budget !== undefined
+        ) {
+          const trainingPoint: TrainingPoint = {
+            poi_id: review.poi_id,
+            transport_mode: review.transport_mode,
+            visit_time: review.visit_time,
+            duration: review.duration,
+            budget: review.budget
+          };
+          
+          await addTrainingPoint(trainingPoint);
+        }
+      }
+
+      // Train the model with the new data
+      const trainingHistory = await trainModel();
+      
+      console.log("tshit:", trainingHistory);
+      if (trainingHistory) {
+        toast.success("Training Successful");
+        
+        // Clear reviews after successful training
+        localStorage.removeItem('reviews');
+        setReviews([]);
+        setIsTrainingEnabled(false);
+      } else {
+        throw new Error("Training failed");
+      }
+    } catch (error) {
+      toast.error("Training Failed");
+    }
   };
 
-  const isReviewPending = (review:any) => {
+  const isReviewPending = (review: Review) => {
     return !review.transport_mode || 
            !review.visit_time || 
            !review.duration || 
            review.budget === undefined;
   };
 
-  const CustomSelect = ({ value, options, onChange, placeholder, index, field }:any) => {
+  interface CustomSelectProps {
+    value: string | undefined;
+    options: Array<{ value: string; label: string }>;
+    onChange: (value: string) => void;
+    placeholder: string;
+    index: number;
+    field: string;
+  }
+
+  const CustomSelect = ({ 
+    value, 
+    options, 
+    onChange, 
+    placeholder, 
+    index, 
+    field 
+  }: CustomSelectProps) => {
     const isOpen = openSelect.index === index && openSelect.field === field;
     
     return (
@@ -74,7 +149,7 @@ const ReviewManager = () => {
         {isOpen && (
           <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg">
             <div className="py-1">
-              {options.map((option:any) => (
+              {options.map((option) => (
                 <button
                   key={option.value}
                   type="button"
@@ -96,13 +171,33 @@ const ReviewManager = () => {
     );
   };
 
+  const transportOptions = [
+    { value: TransportMode.car, label: 'Car' },
+    { value: TransportMode.train, label: 'Train' },
+    { value: TransportMode.bike, label: 'Bike' },
+    { value: TransportMode.walk, label: 'Walk' }
+  ];
+
+  const visitTimeOptions = [
+    { value: VisitTime.morning, label: 'Morning' },
+    { value: VisitTime.afternoon, label: 'Afternoon' },
+    { value: VisitTime.evening, label: 'Evening' },
+    { value: VisitTime.night, label: 'Night' }
+  ];
+
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <h1 className="text-2xl font-bold mb-6">Training Portal</h1>
       <h2 className="text-lg font-bold mb-3">Get rewards for contributing to the model</h2>
       
+      {modelState.error && (
+        <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-md">
+          {modelState.error}
+        </div>
+      )}
+      
       <div className="space-y-4">
-        {reviews.map((review:any, index:any) => (
+        {reviews.map((review, index) => (
           <div 
             key={index}
             className={`bg-white rounded-lg border-2 ${
@@ -120,16 +215,11 @@ const ReviewManager = () => {
                   <label className="text-sm font-medium mb-1 block">Transport Mode</label>
                   <CustomSelect
                     value={review.transport_mode}
-                    onChange={(value:any) => handleUpdateReview(index, 'transport_mode', value)}
+                    onChange={(value) => handleUpdateReview(index, 'transport_mode', value as TransportMode)}
                     placeholder="Select transport mode"
                     index={index}
                     field="transport"
-                    options={[
-                      { value: 'walking', label: 'Walking' },
-                      { value: 'cycling', label: 'Cycling' },
-                      { value: 'driving', label: 'Driving' },
-                      { value: 'public', label: 'Public Transport' }
-                    ]}
+                    options={transportOptions}
                   />
                 </div>
                 
@@ -137,16 +227,11 @@ const ReviewManager = () => {
                   <label className="text-sm font-medium mb-1 block">Visit Time</label>
                   <CustomSelect
                     value={review.visit_time}
-                    onChange={(value:any) => handleUpdateReview(index, 'visit_time', value)}
+                    onChange={(value) => handleUpdateReview(index, 'visit_time', value as VisitTime)}
                     placeholder="Select visit time"
                     index={index}
                     field="visit"
-                    options={[
-                      { value: 'morning', label: 'Morning' },
-                      { value: 'afternoon', label: 'Afternoon' },
-                      { value: 'evening', label: 'Evening' },
-                      { value: 'night', label: 'Night' }
-                    ]}
+                    options={visitTimeOptions}
                   />
                 </div>
                 
@@ -196,16 +281,18 @@ const ReviewManager = () => {
         <div className="mt-6 text-center">
           <button
             onClick={handleTrainModel}
-            disabled={!isTrainingEnabled}
+            disabled={!isTrainingEnabled || modelState.isTraining}
             className={`
               inline-flex items-center px-4 py-2 rounded-md text-white
-              ${isTrainingEnabled 
+              ${isTrainingEnabled && !modelState.isTraining
                 ? 'bg-blue-600 hover:bg-blue-700' 
                 : 'bg-blue-300 cursor-not-allowed'}
             `}
           >
             <Train className="mr-2 h-4 w-4" />
-            Train Model ({reviews.length} reviews)
+            {modelState.isTraining 
+              ? 'Training...' 
+              : `Train Model (${reviews.length} reviews)`}
           </button>
           {!isTrainingEnabled && (
             <p className="text-sm text-gray-500 mt-2">
