@@ -5,6 +5,8 @@ import { Clock, DollarSign, MapPin, Train, ChevronDown } from 'lucide-react';
 import { useFederatedLearning, TransportMode, VisitTime } from '@/components/federated/FederatedTest';
 import { toast } from 'react-toastify'
 import { useReviewsByPlace } from '@/lib/hooks/reviewsByPlace.hook';
+import { useWriteInputBoxAddInput } from "@/lib/hooks/generated";
+import { Hex } from "viem";
 
 interface Review {
   poi_id: number;
@@ -25,12 +27,42 @@ interface TrainingPoint {
 
 const ReviewManager = () => {
 
-  const {getPosts} = useReviewsByPlace();
+  const dAppAddress = `0xee8D87109DF70d66805542dB8A0c25d1723c85b7`;
+
+  const { writeContractAsync } = useWriteInputBoxAddInput();
+
+  const getWeights = () => {
+    const userWeights = localStorage?.getItem("userWeights");
+    return userWeights;
+  }
+
+  async function submitWeightsToCartesi() {
+    console.log("submitting weights to cartest function triggered");
+
+    const payload = JSON.stringify({
+      method: "submitWeights",
+      data: getWeights()
+    });
+
+    try {
+      await writeContractAsync({
+        args: [
+          dAppAddress,
+          payload as Hex,
+        ],
+      });
+    }
+    catch (err: any) {
+      console.log("CARTESI ERROR MESSAGE:", err);
+    }
+  }
+
+  const { getPosts } = useReviewsByPlace();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isTrainingEnabled, setIsTrainingEnabled] = useState(false);
-  const [openSelect, setOpenSelect] = useState<{ index: number | null; field: string | null }>({ 
-    index: null, 
-    field: null 
+  const [openSelect, setOpenSelect] = useState<{ index: number | null; field: string | null }>({
+    index: null,
+    field: null
   });
 
   // Initialize the federated learning hook
@@ -38,52 +70,53 @@ const ReviewManager = () => {
     addTrainingPoint,
     trainModel,
     modelState,
+    getModelWeights
   } = useFederatedLearning();
 
-  useEffect( () => {
+  useEffect(() => {
     const storedReviews = JSON.parse(localStorage.getItem('reviews') || '[]') as Review[];
     setReviews(storedReviews);
 
     const getPublicStats = async () => {
 
-    const reviewsWithStats = await Promise.all(
-      reviews.map(async (localRev) => {
-        const placeIpfsReviews = await getPosts(localRev.poi_id.toString());
-    
-        // Extract ratings and tags from the attributes array
-        const ratings:any = [];
-        const tags:any = [];
-    
-        placeIpfsReviews.forEach((review:any) => {
-          review.attributes.forEach((attr:any) => {
-            if (attr.trait_type === "rating") {
-              ratings.push(attr.value); // Collect ratings
-            } else {
-              tags.push(attr.trait_type); // Collect non-rating tags
-            }
+      const reviewsWithStats = await Promise.all(
+        reviews.map(async (localRev) => {
+          const placeIpfsReviews = await getPosts(localRev.poi_id.toString());
+
+          // Extract ratings and tags from the attributes array
+          const ratings: any = [];
+          const tags: any = [];
+
+          placeIpfsReviews.forEach((review: any) => {
+            review.attributes.forEach((attr: any) => {
+              if (attr.trait_type === "rating") {
+                ratings.push(attr.value); // Collect ratings
+              } else {
+                tags.push(attr.trait_type); // Collect non-rating tags
+              }
+            });
           });
-        });
-    
-        // Calculate the average rating
-        const averageRating = ratings.reduce((sum:any, rating:any) => sum + rating, 0) / ratings.length;
-    
-        // Find the most frequent tag
-        const tagCounts = tags.reduce((acc:any, tag:any) => {
-          acc[tag] = (acc[tag] || 0) + 1;
-          return acc;
-        }, {});
-    
-        const mostFrequentTag = Object.keys(tagCounts).reduce((maxTag:any, tag:any) => {
-          return tagCounts[tag] > (tagCounts[maxTag] || 0) ? tag : maxTag;
-        }, null);
-    
-        return {
-          ...localRev,
-          rating: isNaN(averageRating) ? 0 : averageRating,
-          tag: mostFrequentTag || "None" // Handle case where no tags are found
-        };
-      })
-    );
+
+          // Calculate the average rating
+          const averageRating = ratings.reduce((sum: any, rating: any) => sum + rating, 0) / ratings.length;
+
+          // Find the most frequent tag
+          const tagCounts = tags.reduce((acc: any, tag: any) => {
+            acc[tag] = (acc[tag] || 0) + 1;
+            return acc;
+          }, {});
+
+          const mostFrequentTag = Object.keys(tagCounts).reduce((maxTag: any, tag: any) => {
+            return tagCounts[tag] > (tagCounts[maxTag] || 0) ? tag : maxTag;
+          }, null);
+
+          return {
+            ...localRev,
+            rating: isNaN(averageRating) ? 0 : averageRating,
+            tag: mostFrequentTag || "None" // Handle case where no tags are found
+          };
+        })
+      );
 
     }
 
@@ -92,10 +125,10 @@ const ReviewManager = () => {
   }, []);
 
   const checkTrainingEnabled = (currentReviews: Review[]) => {
-    const allComplete = currentReviews.every((review) => 
-      review.transport_mode && 
-      review.visit_time && 
-      review.duration && 
+    const allComplete = currentReviews.every((review) =>
+      review.transport_mode &&
+      review.visit_time &&
+      review.duration &&
       review.budget !== undefined
     );
     setIsTrainingEnabled(allComplete);
@@ -107,7 +140,7 @@ const ReviewManager = () => {
       ...updatedReviews[index],
       [field]: value
     };
-    
+
     setReviews(updatedReviews);
     localStorage.setItem('reviews', JSON.stringify(updatedReviews));
     checkTrainingEnabled(updatedReviews);
@@ -131,21 +164,31 @@ const ReviewManager = () => {
             duration: review.duration,
             budget: review.budget
           };
-          
+
           await addTrainingPoint(trainingPoint);
         }
       }
 
       // Train the model with the new data
       const trainingHistory = await trainModel();
-      
+
       console.log("tshit:", trainingHistory);
       if (trainingHistory) {
         toast.success("Training Successful");
-        
+
         // Clear reviews after successful training
-        localStorage.removeItem('reviews');
-        setReviews([]);
+        // localStorage.removeItem('reviews');
+        // setReviews([]);
+
+        const modelweights = await getModelWeights();
+
+        console.log("wwweeee: ", modelweights);
+
+        // stote in localstorage
+        const loc = localStorage.setItem("userWeights", JSON.stringify(modelweights));
+
+        await submitWeightsToCartesi();
+
         setIsTrainingEnabled(false);
       } else {
         throw new Error("Training failed");
@@ -156,10 +199,10 @@ const ReviewManager = () => {
   };
 
   const isReviewPending = (review: Review) => {
-    return !review.transport_mode || 
-           !review.visit_time || 
-           !review.duration || 
-           review.budget === undefined;
+    return !review.transport_mode ||
+      !review.visit_time ||
+      !review.duration ||
+      review.budget === undefined;
   };
 
   interface CustomSelectProps {
@@ -171,16 +214,16 @@ const ReviewManager = () => {
     field: string;
   }
 
-  const CustomSelect = ({ 
-    value, 
-    options, 
-    onChange, 
-    placeholder, 
-    index, 
-    field 
+  const CustomSelect = ({
+    value,
+    options,
+    onChange,
+    placeholder,
+    index,
+    field
   }: CustomSelectProps) => {
     const isOpen = openSelect.index === index && openSelect.field === field;
-    
+
     return (
       <div className="relative">
         <button
@@ -193,7 +236,7 @@ const ReviewManager = () => {
           </span>
           <ChevronDown className="h-4 w-4 text-gray-500" />
         </button>
-        
+
         {isOpen && (
           <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg">
             <div className="py-1">
@@ -201,9 +244,8 @@ const ReviewManager = () => {
                 <button
                   key={option.value}
                   type="button"
-                  className={`w-full px-3 py-2 text-left hover:bg-blue-50 ${
-                    value === option.value ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
-                  }`}
+                  className={`w-full px-3 py-2 text-left hover:bg-blue-50 ${value === option.value ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                    }`}
                   onClick={() => {
                     onChange(option.value);
                     setOpenSelect({ index: null, field: null });
@@ -237,20 +279,19 @@ const ReviewManager = () => {
     <div className="container mx-auto p-4 max-w-4xl">
       <h1 className="text-2xl font-bold mb-6">Training Portal</h1>
       <h2 className="text-lg font-bold mb-3">Get rewards for contributing to the model</h2>
-      
+
       {modelState.error && (
         <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-md">
           {modelState.error}
         </div>
       )}
-      
+
       <div className="space-y-4">
         {reviews.map((review, index) => (
-          <div 
+          <div
             key={index}
-            className={`bg-white rounded-lg border-2 ${
-              isReviewPending(review) ? 'border-orange-400' : 'border-green-400'
-            } shadow-sm`}
+            className={`bg-white rounded-lg border-2 ${isReviewPending(review) ? 'border-orange-400' : 'border-green-400'
+              } shadow-sm`}
           >
             <div className="p-6">
               <div className="flex items-center gap-2 mb-6">
@@ -270,7 +311,7 @@ const ReviewManager = () => {
                     options={transportOptions}
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium mb-1 block">Visit Time</label>
                   <CustomSelect
@@ -282,7 +323,7 @@ const ReviewManager = () => {
                     options={visitTimeOptions}
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium mb-1 flex items-center">
                     <Clock className="h-4 w-4 mr-1" />
@@ -296,7 +337,7 @@ const ReviewManager = () => {
                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium mb-1 flex items-center">
                     <DollarSign className="h-4 w-4 mr-1" />
@@ -315,8 +356,8 @@ const ReviewManager = () => {
 
             <div className="px-6 py-4 border-t">
               <div className="text-sm text-gray-500">
-                Status: {isReviewPending(review) ? 
-                  <span className="text-orange-500">Pending</span> : 
+                Status: {isReviewPending(review) ?
+                  <span className="text-orange-500">Pending</span> :
                   <span className="text-green-500">Ready</span>
                 }
               </div>
@@ -333,13 +374,13 @@ const ReviewManager = () => {
             className={`
               inline-flex items-center px-4 py-2 rounded-md text-white
               ${isTrainingEnabled && !modelState.isTraining
-                ? 'bg-blue-600 hover:bg-blue-700' 
+                ? 'bg-blue-600 hover:bg-blue-700'
                 : 'bg-blue-300 cursor-not-allowed'}
             `}
           >
             <Train className="mr-2 h-4 w-4" />
-            {modelState.isTraining 
-              ? 'Training...' 
+            {modelState.isTraining
+              ? 'Training...'
               : `Train Model (${reviews.length} reviews)`}
           </button>
           {!isTrainingEnabled && (
