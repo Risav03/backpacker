@@ -1,19 +1,32 @@
+'use client'
+import { useRpcProviders } from '@dynamic-labs/sdk-react-core';
 import React from 'react'
+import { evmProvidersSelector } from '@dynamic-labs/ethereum-core'
 
-export const useContractSetup = ({address, abi}:{address:string, abi:any}) => {
+import { getWeb3Provider,getSigner} from '@dynamic-labs/ethers-v6'
+import { Contract, InterfaceAbi, ethers } from 'ethers'
+
+
+
+export const useContractSetup = async ({address, abi, wallet}:{address:string, abi:any, wallet:any}) => {
 
     try {
         //@ts-ignore
         if (typeof window.ethereum !== 'undefined') {
 
-            //@ts-ignore
-            await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const provider = await getWeb3Provider(wallet)
+            const signer = await getSigner(wallet)
 
-            //@ts-ignore
-            const provider = new ethers.providers.Web3Provider(window.ethereum);
-            const signer = provider.getSigner();
-            //@ts-ignore
-            const contract = new ethers.Contract(address, abi, signer);
+            console.log("Provider",provider);
+            console.log("Signer", signer);
+
+
+            // //@ts-ignore
+            const contract = new Contract(
+                address,
+                abi,
+                signer
+              )
             return contract;
 
         }
