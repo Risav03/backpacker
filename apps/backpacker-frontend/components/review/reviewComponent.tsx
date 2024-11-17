@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { TextInput } from '../UI/textInput'
 import { useReviewHooks } from '@/lib/hooks/reviewComp.hook'
 import { ImageInput } from '../UI/imageInput'
@@ -15,148 +15,297 @@ import Navbar from "@/components/UI/navbar"
 import { useDynamicContext } from '@dynamic-labs/sdk-react-core'
 import { useGlobalContext } from '@/context/MainContext'
 import axios from 'axios'
+import { Search } from 'lucide-react';
 
+interface SearchResult {
+  properties: {
+    id: string;
+    name: string;
+    label: string;
+    country: string;
+    region: string;
+    locality?: string;
+    confidence: number;
+  };
+  geometry: {
+    coordinates: [number, number];
+  };
+}
 
-export const ReviewComponent = () => {
-    const {name, setName, description, setDescription, tags, setTags, image, setImage, handleImageChange, rating, setRating} = useReviewHooks();
+interface ReviewFormData {
+  name: string;
+  description: string;
+  tags: string[];
+  image: File | null;
+  rating: string;
+}
 
-    const { place, setPlace } = useGlobalContext();
-    const { primaryWallet } = useDynamicContext()
+const CombinedReviewSearch = () => {
+  // Search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<SearchResult | null>(null);
 
-    const { upload, isUploading, uploadResult } = useUploadToIPFS();
-    const {address} = useAccount();
+  const { upload, isUploading } = useUploadToIPFS();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-    useEffect(() => {
-      if(!place) return;
-      console.log("place", place);
-      setName(place?.properties.name);
-    }, [place])
-  
-    const handleUpload = async () => {
+  // Review form states
+  const [formData, setFormData] = useState<ReviewFormData>({
+    name: '',
+    description: '',
+    tags: [],
+    image: null,
+    rating: ''
+  });
 
-      if (!image) {
+  // Wallet connection
+  const { address } = useAccount();
+  const { primaryWallet } = useDynamicContext();
+
+  const handleSearch = async () => {
+    if (!address) {
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    if (!searchQuery.trim()) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(
+        `https://api.geocode.earth/v1/search?api_key=ge-f18721c480b9aafe&text=${encodeURIComponent(searchQuery)}`,
+        { 
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+      const data = await response.json();
+      setSearchResults(data.features);
+    } catch (error) {
+      console.error('Error fetching places:', error);
+      setError('Failed to fetch place data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePlaceSelect = (place: SearchResult) => {
+    setSelectedPlace(place);
+    setFormData(prev => ({ ...prev, name: place.properties.name }));
+    setSearchResults([]);
+    setSearchQuery('');
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setFormData(prev => ({ ...prev, image: file }));
+  };
+
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+
+      // Validation checks
+      if (!formData.image) {
         toast.error('Please select an image');
         return;
       }
-      if(!address){
+      if (!address) {
         toast.error('Please connect your wallet');
         return;
       }
-      if(!place){
+      if (!selectedPlace) {
         toast.error('Please select a place');
         return;
       }
+      if (!formData.description || !formData.name || !formData.rating) {
+        toast.error('Please fill all required fields');
+        return;
+      }
 
-      console.log(contractAdds.minting, mintingAbi)
-      const contract = await useContractSetup({address: contractAdds.minting, abi: mintingAbi, wallet:primaryWallet});
+      // Contract setup
+      const contract = await useContractSetup({
+        address: contractAdds.minting,
+        abi: mintingAbi,
+        wallet: primaryWallet
+      });
 
-      const result = await upload(place?.properties.id , image, description, name, tags, Number(rating));
+      // Upload to IPFS
+      const result = await upload(
+        selectedPlace.properties.id,
+        formData.image,
+        formData.description,
+        formData.name,
+        formData.tags,
+        Number(formData.rating)
+      );
+
       if (result.success) {
-        console.log('Image URL:', getIPFSUrl(result.imageCid!));
-        console.log('Metadata URL:', getIPFSUrl(result.metadataCid!));
-
-        //add to localstorage
-        const reviews:any = JSON.parse(localStorage.getItem('reviews') || '[]');
-        localStorage.setItem('reviews', JSON.stringify([...reviews,
+        // Store in localStorage
+        const reviews = JSON.parse(localStorage.getItem('reviews') || '[]');
+        localStorage.setItem('reviews', JSON.stringify([
+          ...reviews,
           {
-            poi_id: place?.properties.id,
-            poi_name: name,
+            poi_id: selectedPlace.properties.id,
+            poi_name: formData.name,
             transport_mode: undefined,
             visit_time: undefined,
             duration: undefined,
             budget: undefined,
-          }]
-        ));
+          }
+        ]));
 
-        const formData = new FormData();
+        // Prepare and send data to mint endpoint
+        const formDataToSend = new FormData();
+        formDataToSend.append('id', selectedPlace.properties.id);
+        formDataToSend.append('uri', getIPFSUrl(result.metadataCid!));
+        formDataToSend.append('address', address);
 
-      formData.append('id', place.properties.id);
-      formData.append('uri', getIPFSUrl(result.metadataCid!));
-      formData.append('address', address as string );
+        const mintResponse = await axios.post("/api/mint", formDataToSend);
 
-      const res = await axios.post("/api/mint",formData);
-      
-
+        if (mintResponse.status === 200) {
+          toast.success('Review submitted successfully!');
+          // Reset form
+          setSelectedPlace(null);
+          setFormData({
+            name: '',
+            description: '',
+            tags: [],
+            image: null,
+            rating: ''
+          });
+        } else {
+          throw new Error('Minting failed');
+        }
       } else {
-        console.error('Upload failed:', result.error);
+        throw new Error(result.error || 'Upload failed');
       }
-
-    };
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to submit review');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className='flex flex-col items-center h-screen bg-white'>
-      <div className='w-full flex items-center justify-center'>
-        <Navbar />
-      </div>
-      
-     
-      <div className='w-full px-4 md:px-0 md:w-[80%] flex flex-col md:flex-row items-center justify-center gap-10 md:gap-20'>
-       
-        <div className='w-full max-w-md flex justify-center md:w-auto'>
-          <ImageInput handleChange={handleImageChange} image={image as File} />
+    <div className="max-w-4xl mx-auto p-6">
+      {/* Search Section */}
+      <div className="mb-8">
+        <div className="flex gap-4 mb-4">
+          <input
+            type="text"
+            className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+            placeholder="Search for a place..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          />
+          <button
+            onClick={handleSearch}
+            disabled={isLoading}
+            className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300"
+          >
+            {isLoading ? (
+              <div className="animate-spin"><Search className="h-4 w-4" /></div>
+            ) : (
+              <>
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </>
+            )}
+          </button>
         </div>
-        
-      
-        <div className='w-full  flex flex-col gap-10 items-center justify-center md:w-auto'>
-          <div className='w-full'>
-            <TextInput 
-              content={name} 
-              heading='Name' 
-              placeholder='Name your review' 
-              required={true} 
-              setContent={setName} 
-              limit={30} 
-            />
+
+        {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+
+        {searchResults.length > 0 && (
+          <div className="space-y-2">
+            {searchResults.map((result, index) => (
+              <div
+                key={index}
+                onClick={() => handlePlaceSelect(result)}
+                className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50"
+              >
+                <h3 className="font-semibold">{result.properties.name}</h3>
+                <p className="text-gray-600 text-sm">{result.properties.label}</p>
+              </div>
+            ))}
           </div>
-          <div className='w-full'>
-            <AreaInput 
-              content={description} 
-              heading='Description' 
-              limit={200} 
-              placeholder='Enter a description' 
-              required={true}  
-              setContent={setDescription}  
-            />
+        )}
+      </div>
+
+      {/* Review Form Section */}
+      {selectedPlace && (
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Image
+            </label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="w-full"
+              />
+            </div>
           </div>
-          <div className='w-full'>
-            <MultiSelect
-              selectedTags={tags}
-              setSelectedTags={setTags}
-              required={true}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Name
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
 
-          {/* <div className='w-full flex flex-row gap-2'>
-              <div onClick={()=>setRating(1)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==1 && " bg-green-400 " }`}>1</div>
-              <div onClick={()=>setRating(2)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==2 && " bg-green-400 " }`}>2</div>
-              <div onClick={()=>setRating(3)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==3 && " bg-green-400 " }`}>3</div>
-              <div onClick={()=>setRating(4)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==4 && " bg-green-400 " }`}>4</div>
-              <div onClick={()=>setRating(5)} className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg bg-slate-300 ${rating==5 && " bg-green-400 " }`}>5</div>
-          </div> */}
-
-          <div className='w-full'>
-            <TextInput 
-              content={rating} 
-              heading='Rating' 
-              placeholder='Rate out of 1-5' 
-              required={true} 
-              setContent={setRating} 
-              limit={30} 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg h-32"
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Rating (1-5)
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="5"
+              value={formData.rating}
+              onChange={(e) => setFormData(prev => ({ ...prev, rating: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            className="w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            Submit Review
+          </button>
         </div>
-      </div>
-       
-      <div className='pt-10'>
-        <button 
-          className="bg-white border border-[#6495ED] text-[#6495ED] rounded-md text-sm font-medium hover:bg-[#6495ED] hover:text-white transition duration-150 ease-in-out px-6 py-2"  
-          onClick={handleUpload}
-        >
-         <h1 className='text-xl'>Submit</h1>
-        </button>
-        {isUploading && <h3>Loading...</h3>}
-      </div>
+      )}
     </div>
-  )
-}
+  );
+};
+
+export default CombinedReviewSearch;
